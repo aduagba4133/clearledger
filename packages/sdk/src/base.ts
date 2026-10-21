@@ -64,6 +64,8 @@ const signTransactionCompat = signTransactionFn as (
 ) => Promise<string>;
 
 const MAX_TRANSACTION_POLL_ATTEMPTS = 30;
+const TRANSACTION_POLL_BASE_DELAY_MS = 1000;
+const TRANSACTION_POLL_MAX_DELAY_MS = 4000;
 const activeWrites = new Set<string>();
 
 /** Thrown when the same contract action is already awaiting confirmation. */
@@ -505,7 +507,13 @@ export class BaseContractClient {
       response.status === rpc.Api.GetTransactionStatus.NOT_FOUND &&
       attempts < MAX_TRANSACTION_POLL_ATTEMPTS
     ) {
-      await wait(1000, options.signal);
+      await wait(
+        Math.min(
+          TRANSACTION_POLL_MAX_DELAY_MS,
+          TRANSACTION_POLL_BASE_DELAY_MS * 2 ** Math.min(attempts - 1, 2),
+        ),
+        options.signal,
+      );
       response = await withRetry(() => server.getTransaction(result.hash), options);
       attempts++;
     }
